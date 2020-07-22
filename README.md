@@ -6,11 +6,11 @@ Access via http://localhost:EXTERNAL-POTS/:sport_name/:date
 Blank date defaults to the current date
 
 Supported Sports
-"mlb"
-"nba"
-"ncaam" (Men's College Basketball, only Top 25 Teams)
-"ncaaf" (Men's College Football)
-"nfl"
+* "mlb"
+* "nba"
+* "ncaam" (Men's College Basketball, only Top 25 Teams) 
+* "ncaaf" (Men's College Football)
+* "nfl"
 
 Example Docker-Compose File
 
