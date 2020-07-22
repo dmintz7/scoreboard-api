@@ -1,7 +1,7 @@
 # ESPN-Scoreboard
 API that scrapes ESPN Scoreboard
 
-Access via http://localhost:EXTERNAL-POTS/:sport_name/:date
+Access via http://localhost:EXTERNAL-PORT/:sport_name/:date
 
 Blank date defaults to the current date
 
