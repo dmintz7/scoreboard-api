@@ -3,6 +3,8 @@ from flask import Flask, abort, render_template
 from datetime import datetime
 
 base_url = "https://www.espn.com"
+web_root = "/scoreboard/"
+nfl_start_date = "20200910"
 
 leagues = {
 	"mlb": "mlb",
@@ -15,15 +17,16 @@ leagues = {
 
 app = Flask(__name__)
 
-@app.route(os.environ['WEB_ROOT'])
+@app.route(web_root)
 def index():
 	try:
-		return render_template('index.html', WEB_ROOT=os.environ['WEB_ROOT'])
+		return render_template('index.html', WEB_ROOT=web_root)
 	except:
+		raise
 		abort(404)
 		
-@app.route(os.environ['WEB_ROOT'] + '<league>', defaults={'game_date': datetime.today().strftime("%Y%m%d")})
-@app.route(os.environ['WEB_ROOT'] + '<league>' + '/<game_date>')
+@app.route(web_root + '<league>', defaults={'game_date': datetime.today().strftime("%Y%m%d")})
+@app.route(web_root + '<league>' + '/<game_date>')
 def scoreboard(league, game_date):
 	try:
 		datetime.strptime(game_date, '%Y%m%d')
@@ -34,10 +37,10 @@ def scoreboard(league, game_date):
 		espn_league = leagues[league]
 	except:
 		return "Invalid League. Please choose MLB, NBA, NFL, NCAAM or NCAAF"
-		
+	
 	if league == 'nfl':
-		week_num = datetime.strptime(game_date, '%Y%m%d').isocalendar()[1] - datetime.strptime(os.environ['NFL_WEEK_1_START'], '%Y%m%d').isocalendar()[1] + 1
-		if datetime.strptime(os.environ['NFL_WEEK_1_START'], '%Y%m%d') > datetime.strptime(game_date, '%Y%m%d'):
+		week_num = datetime.strptime(game_date, '%Y%m%d').isocalendar()[1] - datetime.strptime(nfl_start_date, '%Y%m%d').isocalendar()[1] + 1
+		if datetime.strptime(nfl_start_date, '%Y%m%d') > datetime.strptime(game_date, '%Y%m%d'):
 			week_num = 5 + week_num
 			season = "1"
 		else:
@@ -89,6 +92,7 @@ def cleanDefault(data):
 				if 'name' in game['teams'][x]: del game['teams'][x]['name']
 	except:
 		json_data = {}
+		raise
 
 	return json_data
 	
@@ -140,14 +144,15 @@ def cleanNHL(data):
 				del game['teams'][x]['id']
 				del game['teams'][x]['uid']
 			
-				game['teams'][x]['abbreviation'] = game['teams'][x]['abbrev']
 				game['teams'][x]['alternateColor'] = game['teams'][x]['altColor']
 				game['teams'][x]['color'] = game['teams'][x]['teamColor']
 				
-				del game['teams'][x]['abbrev']
 				del game['teams'][x]['altColor']
 				del game['teams'][x]['teamColor']
 	except:
 		json_data = {}
 
 	return json_data
+	
+if __name__ == "__main__":
+	app.run(host= '0.0.0.0', port=8765)
