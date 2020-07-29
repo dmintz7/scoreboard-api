@@ -1,4 +1,4 @@
-import os, requests, json
+import os, requests, json, pytz
 from flask import Flask, abort, render_template
 from datetime import datetime
 
@@ -22,10 +22,11 @@ def index():
 	except:
 		abort(404)
 		
-@app.route(os.environ['WEB_ROOT'] + '<league>', defaults={'game_date': datetime.today().strftime("%Y%m%d")})
-@app.route(os.environ['WEB_ROOT'] + '<league>' + '/<game_date>')
+@app.route(os.environ['WEB_ROOT'] + '<league>/', defaults={'game_date': None})
+@app.route(os.environ['WEB_ROOT'] + '<league>/<game_date>/')
 def scoreboard(league, game_date):
 	try:
+		if game_date is None: game_date = datetime.today().replace(tzinfo=pytz.UTC).astimezone(pytz.timezone(os.environ['TIME_ZONE'])).strftime("%Y%m%d")
 		datetime.strptime(game_date, '%Y%m%d')
 	except ValueError:
 		return "Invalid Date Format. Should be YYYYMMDD"
@@ -62,10 +63,12 @@ def cleanDefault(data):
 		json_data = json.loads(data)['events']
 		for game in json_data:
 			game['teams'] = {}
-			game['teams'][game['competitions'][0]['competitors'][0]['homeAway']] = game['competitions'][0]['competitors'][0]['team']
-			game['teams'][game['competitions'][0]['competitors'][1]['homeAway']] = game['competitions'][0]['competitors'][1]['team']
-			game['teams'][game['competitions'][0]['competitors'][0]['homeAway']]['score'] = game['competitions'][0]['competitors'][0]['score']
-			game['teams'][game['competitions'][0]['competitors'][1]['homeAway']]['score'] = game['competitions'][0]['competitors'][1]['score']
+			for x in range(0,2):
+				game['teams'][game['competitions'][0]['competitors'][x]['homeAway']] = game['competitions'][0]['competitors'][x]['team']
+				game['teams'][game['competitions'][0]['competitors'][x]['homeAway']]['score'] = game['competitions'][0]['competitors'][x]['score']
+				if 'records' in game['competitions'][0]['competitors'][x]:
+					for teams in game['competitions'][0]['competitors'][x]['records']:
+						if teams['type'] == 'total': game['teams'][game['competitions'][0]['competitors'][x]['homeAway']]['standing'] = game['competitions'][0]['competitors'][x]['records'][0]['summary']
 			
 			game['status']['state'] = game['status']['type']['state']
 			game['status']['detail'] = game['status']['type']['detail']
@@ -100,8 +103,12 @@ def cleanNHL(data):
 		json_data = json.loads(data)['page']['content']['scoreboard']['events'][0]
 		for game in json_data:
 			game['teams'] = {}
-			game['teams']['home' if game['competitors'][0]['isHome'] else 'away'] = game['competitors'][0]
-			game['teams']['home' if game['competitors'][1]['isHome'] else 'away'] = game['competitors'][1]
+			for x in range(0,2):
+				game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
+					for teams in game['competitors'][x]['records']:
+						if teams['type'] == 'total': game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = game['competitors'][x]['records'][0]['summary']
+			
+			
 			game["name"] = game['teams']['away']['displayName'] + " at " + game['teams']['home']['displayName']
 			game["shortName"] = game['teams']['away']['abbrev'] + " @ " + game['teams']['home']['abbrev']
 			

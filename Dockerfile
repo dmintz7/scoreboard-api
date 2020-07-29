@@ -13,6 +13,7 @@ WORKDIR /app
 RUN pip3 install -r requirements.txt
 
 ENV WEBROOT='/'
+ENV TIME_ZONE='UTC'
 
 EXPOSE 80
 CMD [ "uwsgi", "--ini", "/app/espn-scoreboard.ini" ]
