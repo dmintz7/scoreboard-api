@@ -105,6 +105,7 @@ def cleanNHL(data):
 			game['teams'] = {}
 			for x in range(0,2):
 				game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
+				if 'records' in game['competitors'][x]:
 					for teams in game['competitors'][x]['records']:
 						if teams['type'] == 'total': game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = game['competitors'][x]['records'][0]['summary']
 			
