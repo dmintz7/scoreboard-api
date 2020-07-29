@@ -8,6 +8,7 @@ Blank date defaults to the current date
 Supported Sports
 * "mlb"
 * "nba"
+* "nhl"
 * "ncaam" (Men's College Basketball, only Top 25 Teams) 
 * "ncaaf" (Men's College Football)
 * "nfl"
@@ -24,4 +25,6 @@ Example Docker-Compose File
             - EXTERNAL-PORT:80
         environment:
             - WEB_ROOT=/
+            - TIME_ZONE=UTC
+            - NFL_WEEK_1_START=20200910
         restart: unless-stopped
