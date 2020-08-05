@@ -34,7 +34,7 @@ def scoreboard(league, game_date):
 	try:
 		espn_league = leagues[league]
 	except:
-		return "Invalid League. Please choose MLB, NBA, NFL, NCAAM or NCAAF"
+		return "Invalid League. Please choose MLB, NBA, NFL, NHL, NCAAM or NCAAF"
 		
 	if league == 'nfl':
 		week_num = datetime.strptime(game_date, '%Y%m%d').isocalendar()[1] - datetime.strptime(os.environ['NFL_WEEK_1_START'], '%Y%m%d').isocalendar()[1] + 1
