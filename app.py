@@ -137,7 +137,7 @@ def cleanNHL(data):
 			
 			del game['status']['id']
 			del game['status']['description']
-			game['status']['shortDetail'] = ""
+			game['status']['shortDetail'] = game['status']['detail']
 
 			for x in ['home','away']:
 				del game['teams'][x]['recordSummary']
