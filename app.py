@@ -104,11 +104,13 @@ def cleanNHL(data):
 		for game in json_data:
 			game['teams'] = {}
 			for x in range(0,2):
-				game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
-				if 'records' in game['competitors'][x]:
-					for teams in game['competitors'][x]['records']:
-						if teams['type'] == 'total': game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = game['competitors'][x]['records'][0]['summary']
-			
+				try:
+					game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
+					if 'records' in game['competitors'][x]:
+						for teams in game['competitors'][x]['records']:
+							if teams['type'] == 'total': game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = game['competitors'][x]['records'][0]['summary']
+				except:
+					pass
 			
 			game["name"] = game['teams']['away']['displayName'] + " at " + game['teams']['home']['displayName']
 			game["shortName"] = game['teams']['away']['abbrev'] + " @ " + game['teams']['home']['abbrev']
