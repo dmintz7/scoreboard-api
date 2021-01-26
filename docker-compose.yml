@@ -1,0 +1,13 @@
+version: '2'
+services:
+  espn-scoreboard:
+    container_name: espn-scoreboard
+    image: dmintz7/espn-scoreboard
+    build: .
+    ports:
+      - 8765:80
+    environment:
+      - WEB_ROOT=/scoreboard/
+      - NFL_WEEK_1_START=20200910
+      - TIME_ZONE=America/New_York
+    restart: unless-stopped
