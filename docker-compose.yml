@@ -9,5 +9,5 @@ services:
     environment:
       - WEB_ROOT=/scoreboard/
       - NFL_WEEK_1_START=20200910
-      - TIME_ZONE=America/New_York
+      - TZ=America/New_York
     restart: unless-stopped
