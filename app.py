@@ -1,5 +1,8 @@
 import json
+import logging
 import os
+import sys
+
 import pytz
 import requests
 from datetime import datetime
@@ -19,6 +22,14 @@ leagues = {
 
 app = Flask(__name__)
 
+formatter = logging.Formatter('%(asctime)s - %(levelname)10s - %(module)15s:%(funcName)30s:%(lineno)5s - %(message)s')
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+consoleHandler = logging.StreamHandler(sys.stdout)
+consoleHandler.setFormatter(formatter)
+logger.addHandler(consoleHandler)
+logger.setLevel(os.environ['LOG_LEVEL'].upper())
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 @app.route(os.environ['WEB_ROOT'])
 def index():
@@ -35,7 +46,7 @@ def scoreboard(league, game_date):
 	try:
 		if game_date is None:
 			game_date = datetime.today().replace(tzinfo=pytz.UTC).astimezone(
-				pytz.timezone(os.environ['TIME_ZONE'])).strftime("%Y%m%d")
+				pytz.timezone(os.environ['TZ'])).strftime("%Y%m%d")
 		datetime.strptime(game_date, '%Y%m%d')
 	except ValueError:
 		return "Invalid Date Format. Should be YYYYMMDD"
@@ -118,11 +129,14 @@ def clean_default(data):
 
 
 def clean_nhl(data):
-	start = data.text.find(" <script type='text/javascript' >window['__espnfitt__']") + 56
-	end = data.text.find("</script>", start - 1)
+	start = data.text.find('"scoreboard":{"league":{') + 13
+	end = data.text.find(',"transition"', start + 1)-1
 	data = data.text[start:end].replace(";", "").strip()
 	try:
-		json_data = json.loads(data)['page']['content']['scoreboard']['events'][0]
+		# json_data = json.loads(data)['page']['content']['scoreboard']['events'][0]
+		json_data = json.loads(data)['evts']
+		# logger.info(json_data[:50])
+		# logger.info(json_data[-50:])
 		for game in json_data:
 			game['teams'] = {}
 			for x in range(0, 2):
