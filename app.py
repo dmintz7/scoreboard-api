@@ -69,22 +69,19 @@ def scoreboard(league, game_date, raw):
 
 	logger.debug("Fetching Data from %s" % url)
 	data = requests.get(url)
-	events_raw = league_events(league, data)
+	events_raw = get_events(data)
 	logger.info((league, game_date, raw, url, type(events_raw)))
 	events_raw['date'] = game_date
 	if raw:
 		events = fix_json(events_raw)
 	else:
-		if league in ('nhl', 'nfl', 'ncaaf'):
-			events = clean_alternate(events_raw)
-		else:
-			events = clean_default(events_raw)
+		events = clean_json(events_raw)
 	return json.dumps(events)
 
 
 def nfl_start_week():
 	url = "https://www.espn.com/nfl/scoreboard"
-	data = league_events('nfl', requests.get(url))
+	data = get_events(requests.get(url))
 	calendar = data['events'][0]['watchListen']['cmpttn']['lg']['calendar']
 	for x in calendar:
 		if x['label'] == 'Regular Season':
@@ -119,20 +116,12 @@ def format_url(league, game_date):
 		return "Invalid League. Please choose MLB, NBA, NFL, NHL, NCAAM or NCAAF"
 
 
-def league_events(league, original_data):
+def get_events(original_data):
 	try:
-		if league in ('nhl', 'nfl', 'ncaaf'):
-			start = original_data.text.find('"scoreboard":{"league":{') + 13
-			end = original_data.text.find(',"transition"', start + 1)-1
-			data = original_data.text[start:end].replace(";", "").strip()
-			events = json.loads(data)['evts']
-		else:
-			start = original_data.text.find("<script>window.espn.scoreboardData") + 38
-			end = original_data.text.find("</script>", start - 1)
-			data = original_data.text[start:end].replace(";", "").replace("window.espn.scoreboardData", "").replace(
-				"if(!window.espn_ui.device.isMobile){window.espn.loadType = \"ready\"};", "").split(
-				"window.espn.scoreboardSettings")[0].strip()
-			events = json.loads(data)['events']
+		start = original_data.text.find('"scoreboard":{"league":{') + 13
+		end = original_data.text.find(',"transition"', start + 1)-1
+		data = original_data.text[start:end].replace(";", "").strip()
+		events = json.loads(data)['evts']
 	except Exception as e:
 		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
 		events = {}
@@ -155,6 +144,19 @@ def clean_default(data):
 						if teams['type'] == 'total':
 							game['teams'][game['competitions'][0]['competitors'][x]['homeAway']]['standing'] = \
 								game['competitions'][0]['competitors'][x]['records'][0]['summary']
+
+			try:
+				for x in game['competitions'][0]['situation']['lastPlay']['athletesInvolved']:
+					del x['links']
+
+				game['lastPlay'] = game['competitions'][0]['situation']['lastPlay']
+				game['lastPlay']["athltHeadsht"] = game['competitions'][0]['situation']['lastPlay']['athletesInvolved'][0]['headshot']
+				game['lastPlay']["athltNme"] = game['competitions'][0]['situation']['lastPlay']['athletesInvolved'][0]['displayName']
+				game['lastPlay']["lstPlyTxt"] = game['competitions'][0]['situation']['lastPlay']['text']
+			except KeyError:
+				game['lastPlay'] = None
+			except Exception as e:
+				logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
 
 			game['status']['state'] = game['status']['type']['state']
 			game['status']['detail'] = game['status']['type']['detail']
@@ -193,7 +195,7 @@ def clean_default(data):
 	return data
 
 
-def clean_alternate(data):
+def clean_json(data):
 	try:
 		for game in data['events']:
 			try:
