@@ -2,7 +2,7 @@ version: '2'
 services:
   espn-scoreboard:
     container_name: espn-scoreboard
-    image: dmintz7/espn-scoreboard
+    image: dmintz37/espn-scoreboard
     build: .
     ports:
       - 8765:80
