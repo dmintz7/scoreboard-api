@@ -41,7 +41,6 @@ def root():
 
 @app.route(os.environ['WEB_ROOT'])
 def index(web_root=os.environ['WEB_ROOT']):
-	logger.info(request.path)
 	try:
 		return render_template('index.html', WEB_ROOT=web_root)
 	except Exception as e:
@@ -128,77 +127,19 @@ def get_events(original_data):
 	return {'events': events}
 
 
-def clean_default(data):
-	try:
-		game: Any
-		for game in data['events']:
-			game['teams'] = {}
-			game['broadcast'] = {}
-			for x in range(0, 2):
-				game['teams'][game['competitions'][0]['competitors'][x]['homeAway']] = \
-					game['competitions'][0]['competitors'][x]['team']
-				game['teams'][game['competitions'][0]['competitors'][x]['homeAway']]['score'] = \
-					game['competitions'][0]['competitors'][x]['score']
-				if 'records' in game['competitions'][0]['competitors'][x]:
-					for teams in game['competitions'][0]['competitors'][x]['records']:
-						if teams['type'] == 'total':
-							game['teams'][game['competitions'][0]['competitors'][x]['homeAway']]['standing'] = \
-								game['competitions'][0]['competitors'][x]['records'][0]['summary']
-
-			try:
-				for x in game['competitions'][0]['situation']['lastPlay']['athletesInvolved']:
-					del x['links']
-
-				game['lastPlay'] = game['competitions'][0]['situation']['lastPlay']
-				game['lastPlay']["athltHeadsht"] = game['competitions'][0]['situation']['lastPlay']['athletesInvolved'][0]['headshot']
-				game['lastPlay']["athltNme"] = game['competitions'][0]['situation']['lastPlay']['athletesInvolved'][0]['displayName']
-				game['lastPlay']["lstPlyTxt"] = game['competitions'][0]['situation']['lastPlay']['text']
-			except KeyError:
-				game['lastPlay'] = None
-			except Exception as e:
-				logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-
-			game['status']['state'] = game['status']['type']['state']
-			game['status']['detail'] = game['status']['type']['detail']
-			game['status']['shortDetail'] = game['status']['type']['shortDetail']
-			game['status']['completed'] = game['status']['type']['completed']
-			game['venue'] = game['competitions'][0]['venue']
-
-			try:
-				game['broadcast'] = game['competitions'][0]['broadcasts'][0]
-			except IndexError:
-				pass
-			except KeyError:
-				pass
-			except Exception as e:
-				logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-
-			del game['season']
-			del game['uid']
-			del game['id']
-			del game['links']
-			del game['competitions']
-			del game['status']['type']
-			del game['status']['displayClock']
-
-			for x in ['home', 'away']:
-				del game['teams'][x]['links']
-				del game['teams'][x]['id']
-				del game['teams'][x]['uid']
-				del game['teams'][x]['isActive']
-				if 'name' in game['teams'][x]:
-					del game['teams'][x]['name']
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-		data = {}
-
-	return data
-
-
 def clean_json(data):
 	try:
 		for game in data['events']:
 			try:
+
+				for team in game['competitors']:
+					try:
+						if team['score'] == "":
+							team['score'] = team['runs']
+							del team['runs']
+					except KeyError:
+						pass
+
 				game['teams'] = {}
 				for x in range(0, 2):
 					try:
