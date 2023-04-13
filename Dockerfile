@@ -12,7 +12,8 @@ WORKDIR /app
 
 RUN pip3 install -r requirements.txt
 
-ENV WEBROOT='/'
+ENV WEB_ROOT='/'
+ENV LOG_LEVEL='INFO'
 ENV TZ='UTC'
 
 EXPOSE 80

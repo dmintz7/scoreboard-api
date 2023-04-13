@@ -7,8 +7,7 @@ import re
 import pytz
 import requests
 from datetime import datetime, timedelta
-from flask import Flask, abort, render_template, url_for, redirect, request
-from typing import Any
+from flask import Flask, abort, render_template
 
 base_url = "https://www.espn.com"
 
@@ -32,13 +31,12 @@ logger.addHandler(consoleHandler)
 logger.setLevel(os.environ['LOG_LEVEL'].upper())
 logging.getLogger("requests").setLevel(logging.WARNING)
 
+logger.warning(os.environ['WEB_ROOT'])
+if os.environ['WEB_ROOT'][-1] != "/":
+	os.environ['WEB_ROOT'] += "/"
+logger.warning(os.environ['WEB_ROOT'])
 
 @app.route("/")
-def root():
-	logger.info(request.path)
-	return redirect(url_for('index'))
-
-
 @app.route(os.environ['WEB_ROOT'])
 def index(web_root=os.environ['WEB_ROOT']):
 	try:
@@ -55,8 +53,7 @@ def index(web_root=os.environ['WEB_ROOT']):
 def scoreboard(league, game_date, raw):
 	try:
 		if game_date is None:
-			game_date = datetime.today().replace(tzinfo=pytz.UTC).astimezone(
-				pytz.timezone(os.environ['TZ'])).strftime("%Y%m%d")
+			game_date = datetime.today().replace(tzinfo=pytz.UTC).astimezone(pytz.timezone(os.environ['TZ'])).strftime("%Y%m%d")
 		datetime.strptime(game_date, '%Y%m%d')
 	except ValueError:
 		return "Invalid Date Format. Should be YYYYMMDD"
@@ -69,7 +66,7 @@ def scoreboard(league, game_date, raw):
 	logger.debug("Fetching Data from %s" % url)
 	data = requests.get(url)
 	events_raw = get_events(data)
-	logger.info((league, game_date, raw, url, type(events_raw)))
+	logger.debug((league, game_date, raw, url, type(events_raw)))
 	events_raw['date'] = game_date
 	if raw:
 		events = fix_json(events_raw)
@@ -223,7 +220,6 @@ def clean_json(data):
 				remove_element(game, 'tckts')
 				remove_element(game, 'ldrs')
 				remove_element(game, 'intlDate')
-				remove_element(game, 'broadcasts')
 				remove_element(game, 'league')
 				remove_element(game, 'prfrmrTtl')
 				remove_element(game, 'highlight')
@@ -256,7 +252,3 @@ def remove_element(dict_temp, key):
 
 
 start_week = nfl_start_week()
-
-
-if __name__ == "__main__":
-	app.run(host="0.0.0.0", port=8765, debug=True)
