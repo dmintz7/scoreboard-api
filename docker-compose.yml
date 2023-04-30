@@ -5,9 +5,7 @@ services:
     image: dmintz37/espn-scoreboard
     build: .
     ports:
-      - 8765:80
+      - "8765:80"
     environment:
-      - WEB_ROOT=/scoreboard/
-      - NFL_WEEK_1_START=20200910
-      - TZ=America/New_York
+      - WEB_ROOT=/
     restart: unless-stopped

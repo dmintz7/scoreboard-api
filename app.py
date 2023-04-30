@@ -7,7 +7,7 @@ import re
 import pytz
 import requests
 from datetime import datetime, timedelta
-from flask import Flask, abort, render_template
+from flask import Flask, render_template
 
 base_url = "https://www.espn.com"
 
@@ -31,19 +31,13 @@ logger.addHandler(consoleHandler)
 logger.setLevel(os.environ['LOG_LEVEL'].upper())
 logging.getLogger("requests").setLevel(logging.WARNING)
 
-logger.warning(os.environ['WEB_ROOT'])
 if os.environ['WEB_ROOT'][-1] != "/":
 	os.environ['WEB_ROOT'] += "/"
-logger.warning(os.environ['WEB_ROOT'])
 
 @app.route("/")
 @app.route(os.environ['WEB_ROOT'])
 def index(web_root=os.environ['WEB_ROOT']):
-	try:
-		return render_template('index.html', WEB_ROOT=web_root)
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-		abort(404)
+	return render_template('index.html', WEB_ROOT=web_root)
 
 
 @app.route(os.environ['WEB_ROOT'] + 'raw/<league>/', defaults={'game_date': None, 'raw': True})
@@ -57,8 +51,8 @@ def scoreboard(league, game_date, raw):
 		datetime.strptime(game_date, '%Y%m%d')
 	except ValueError:
 		return "Invalid Date Format. Should be YYYYMMDD"
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
+
+	if not valid_league(league):
 		return "Invalid League. Please choose MLB, NBA, NFL, NHL, NCAAM or NCAAF"
 
 	url = format_url(league, game_date)
@@ -90,155 +84,105 @@ def fix_json(data):
 			del game['watchListen']
 	return data
 
+def valid_league(league):
+	try:
+		leagues[league]
+		return True
+	except KeyError:
+		return False
+
 
 def format_url(league, game_date):
-	try:
-		espn_league = leagues[league]
-		if league == 'nfl':
-			this_week = datetime.strptime(game_date, '%Y%m%d')+timedelta(days=1)
-			week_num = this_week.isocalendar()[1] - start_week.isocalendar()[1]
-			if start_week > this_week:
-				week_num = 5 + week_num
-				season = "1"
-			else:
-				season = "2"
-			url = "%s/%s/scoreboard/_/year/%s/seasontype/%s/week/%s" % (base_url, espn_league, start_week.year, season, week_num)
+	espn_league = leagues[league]
+	if league == 'nfl':
+		this_week = datetime.strptime(game_date, '%Y%m%d')+timedelta(days=1)
+		week_num = this_week.isocalendar()[1] - start_week.isocalendar()[1]
+		if start_week > this_week:
+			week_num = 5 + week_num
+			season = "1"
 		else:
-			url = "%s/%s/scoreboard/_/date/%s" % (base_url, espn_league, game_date)
-
-		return url
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-		return "Invalid League. Please choose MLB, NBA, NFL, NHL, NCAAM or NCAAF"
+			season = "2"
+		url = "%s/%s/scoreboard/_/year/%s/seasontype/%s/week/%s" % (base_url, espn_league, start_week.year, season, week_num)
+	else:
+		url = "%s/%s/scoreboard/_/date/%s" % (base_url, espn_league, game_date)
+	return url
 
 
 def get_events(original_data):
-	try:
-		start = original_data.text.find('"scoreboard":{"league":{') + 13
-		end = original_data.text.find(',"transition"', start + 1)-1
-		data = original_data.text[start:end].replace(";", "").strip()
-		events = json.loads(data)['evts']
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-		events = {}
+	start = original_data.text.find('"scoreboard":{"league":{') + 13
+	end = original_data.text.find(',"transition"', start + 1)-1
+	data = original_data.text[start:end].replace(";", "").strip()
+	events = json.loads(data)['evts']
 	return {'events': events}
 
 
 def clean_json(data):
-	try:
-		for game in data['events']:
+	for game in data['events']:
+		for team in game['competitors']:
 			try:
+				if team['score'] == "":
+					team['score'] = team['runs']
+					del team['runs']
+			except KeyError:
+				pass
 
-				for team in game['competitors']:
+		game['teams'] = {}
+		for x in range(0, 2):
+			game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
+
+			if 'records' in game['competitors'][x]:
+				for teams in game['competitors'][x]['records']:
 					try:
-						if team['score'] == "":
-							team['score'] = team['runs']
-							del team['runs']
+						teams = teams[0]
 					except KeyError:
 						pass
 
-				game['teams'] = {}
-				for x in range(0, 2):
-					try:
-						game['teams']['home' if game['competitors'][x]['isHome'] else 'away'] = game['competitors'][x]
+					if teams:
+						if teams['type'] == 'total':
+							game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = \
+								game['competitors'][x]['records'][0]['summary']
 
-						if 'records' in game['competitors'][x]:
-							for teams in game['competitors'][x]['records']:
-								try:
-									teams = teams[0]
-								except KeyError:
-									pass
-								except Exception as e:
-									logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
+		game["name"] = game['teams']['away']['displayName'] + " at " + game['teams']['home']['displayName']
+		game["shortName"] = game['teams']['away']['abbrev'] + " @ " + game['teams']['home']['abbrev']
 
-								if teams:
-									if teams['type'] == 'total':
-										game['teams']['home' if game['competitors'][x]['isHome'] else 'away']['standing'] = \
-											game['competitors'][x]['records'][0]['summary']
-					except Exception as e:
-						logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
+		try:
+			(clock, period) = game['status']['detail'].split(' - ')
+			game['status']['period'] = re.sub("[^0-9]", "", period)
+			game['status']['clock'] = clock
+		except ValueError:
+			game['status']['period'] = 0
+			game['status']['clock'] = 0
 
-				game["name"] = game['teams']['away']['displayName'] + " at " + game['teams']['home']['displayName']
-				game["shortName"] = game['teams']['away']['abbrev'] + " @ " + game['teams']['home']['abbrev']
+		remove_element(game, 'onWatch')
+		game['weather'] = remove_element(game, 'wthr')
+		game['lastPlay'] = remove_element(game, 'lstPly')
+		game['situation'] = remove_element(game, 'situation')
+		game['venue'] = remove_element(game, 'vnue')
+		game['status']['completed'] = remove_element(game, 'completed')
+		game['status']['shortDetail'] = remove_element(game['status'], 'detail')
 
-				try:
-					(clock, period) = game['status']['detail'].split(' - ')
-					game['status']['period'] = re.sub("[^0-9]", "", period)
-					game['status']['clock'] = clock
-				except ValueError:
-					game['status']['period'] = 0
-					game['status']['clock'] = 0
-				except Exception as e:
-					logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-					game['status']['period'] = 0
-					game['status']['clock'] = 0
+		try:
+			temp_text = remove_element(game['metadata'], 'downDistanceText')
+			remove_element(game, 'metadata')
+			game['situation']['downDistanceText'] = temp_text
+		except KeyError:
+			pass
 
-				remove_element(game, 'onWatch')
-				game['weather'] = remove_element(game, 'wthr')
-				game['lastPlay'] = remove_element(game, 'lstPly')
-				game['situation'] = remove_element(game, 'situation')
-				game['venue'] = remove_element(game, 'vnue')
-				game['status']['completed'] = remove_element(game, 'completed')
-				game['status']['shortDetail'] = remove_element(game['status'], 'detail')
+		if len(game['broadcasts']) > 0:
+			game['broadcasts'] = game['broadcasts'][0]
 
-				try:
-					temp_text = remove_element(game['metadata'], 'downDistanceText')
-					remove_element(game, 'metadata')
-					game['situation']['downDistanceText'] = temp_text
-				except KeyError:
-					pass
+		for x in ['home', 'away']:
+			for element in ['recordSummary', 'standingSummary', 'isHome', 'links', 'records', 'uid']:
+				remove_element(game['teams'][x], element)
 
-				if len(game['broadcasts']) > 0:
-					game['broadcasts'] = game['broadcasts'][0]
+			for element in ['abbrev', 'altColor', 'teamColor']:
+				game['teams'][x]['abbreviation'] = remove_element(game['teams'][x], element)
 
-				for x in ['home', 'away']:
-					remove_element(game['teams'][x], 'recordSummary')
-					remove_element(game['teams'][x], 'standingSummary')
-					remove_element(game['teams'][x], 'isHome')
-					remove_element(game['teams'][x], 'links')
-					remove_element(game['teams'][x], 'records')
-					remove_element(game['teams'][x], 'uid')
-
-					game['teams'][x]['abbreviation'] = remove_element(game['teams'][x], 'abbrev')
-					game['teams'][x]['alternateColor'] = remove_element(game['teams'][x], 'altColor')
-					game['teams'][x]['color'] = remove_element(game['teams'][x], 'teamColor')
-
-				remove_element(game['weather'], 'weatherLink')
-
-				remove_element(game, 'watchListen')
-				remove_element(game, 'tbd')
-				remove_element(game, 'link')
-				remove_element(game, 'links')
-				remove_element(game, 'isTie')
-				remove_element(game, 'tcktsAvail')
-				remove_element(game, 'hdeScrDte')
-				remove_element(game, 'tmInfo')
-				remove_element(game, 'allStr')
-				remove_element(game, 'gmeTmeFrmt')
-				remove_element(game, 'rcpDta')
-				remove_element(game, 'lnescrs')
-				remove_element(game, 'tckts')
-				remove_element(game, 'ldrs')
-				remove_element(game, 'intlDate')
-				remove_element(game, 'league')
-				remove_element(game, 'prfrmrTtl')
-				remove_element(game, 'highlight')
-				remove_element(game, 'highlights')
-				remove_element(game, 'odds')
-				remove_element(game, 'day')
-				remove_element(game, 'month')
-				remove_element(game, 'time')
-				remove_element(game, 'hideScoreDate')
-				remove_element(game, 'tickets')
-				remove_element(game, 'competitors')
-			except Exception as e:
-				logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-	except Exception as e:
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
-		data = {}
+		remove_element(game['weather'], 'weatherLink')
+		for element in ['watchListen', 'tbd', 'link', 'links', 'isTie', 'tcktsAvail', 'hdeScrDte', 'tmInfo', 'allStr', 'gmeTmeFrmt', 'rcpDta', 'lnescrs', 'tckts', 'ldrs', 'intlDate', 'league', 'prfrmrTtl', 'highlight', 'highlights', 'odds', 'day', 'month', 'time', 'hideScoreDate', 'tickets', 'competitors']:
+			remove_element(game, element)
 
 	return data
-
 
 def remove_element(dict_temp, key):
 	try:
@@ -246,9 +190,6 @@ def remove_element(dict_temp, key):
 			return dict_temp.pop(key)
 	except KeyError:
 		pass
-	except Exception as e:
-		logger.info((dict_temp, key))
-		logger.error('Error on line {} {} {}'.format(sys.exc_info()[-1].tb_lineno, type(e).__name__, e))
 
 
 start_week = nfl_start_week()
