@@ -20,6 +20,8 @@ leagues = {
 	"ncaaf": "college-football",
 }
 
+headers = {'User-Agent': 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}
+
 app = Flask(__name__)
 
 formatter = logging.Formatter('%(asctime)s - %(levelname)10s - %(module)15s:%(funcName)30s:%(lineno)5s - %(message)s')
@@ -58,7 +60,7 @@ def scoreboard(league, game_date, raw):
 	url = format_url(league, game_date)
 
 	logger.debug("Fetching Data from %s" % url)
-	data = requests.get(url)
+	data = requests.get(url, headers=headers)
 	events_raw = get_events(data)
 	logger.debug((league, game_date, raw, url, type(events_raw)))
 	events_raw['date'] = game_date
@@ -71,7 +73,7 @@ def scoreboard(league, game_date, raw):
 
 def nfl_start_week():
 	url = "https://www.espn.com/nfl/scoreboard"
-	data = get_events(requests.get(url))
+	data = get_events(requests.get(url, headers=headers))
 	calendar = data['events'][0]['watchListen']['cmpttn']['lg']['calendar']
 	for x in calendar:
 		if x['label'] == 'Regular Season':
